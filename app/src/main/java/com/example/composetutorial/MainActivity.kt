@@ -1,6 +1,5 @@
 package com.example.composetutorial
 
-
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -23,7 +22,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.border
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import android.content.res.Configuration
 import com.example.composetutorial.ui.theme.ComposeTutorialTheme
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -62,16 +60,27 @@ fun MessageCard(msg: Message) {
         )
         Spacer(modifier = Modifier.width(8.dp))
 
+        // State to track dark mode and expanded state
         var isExpanded by remember { mutableStateOf(false) }
+        var isDarkMode by remember { mutableStateOf(false) }
+
+        // Background color transitions smoothly based on the isDarkMode state
         val surfaceColor by animateColorAsState(
-            if (isExpanded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+            if (isDarkMode) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.surface
         )
 
-        Column(modifier = Modifier.clickable { isExpanded = !isExpanded }) {
+        Column(
+            modifier = Modifier
+                .clickable {
+                    isExpanded = !isExpanded
+                    isDarkMode = !isDarkMode  // Toggle dark mode on click
+                }
+                .padding(4.dp)
+        ) {
             Text(
                 text = msg.author,
                 color = MaterialTheme.colorScheme.secondary,
-                style = MaterialTheme.typography.titleSmall  // First text style
+                style = MaterialTheme.typography.titleSmall
             )
 
             Spacer(modifier = Modifier.height(4.dp))
@@ -79,14 +88,14 @@ fun MessageCard(msg: Message) {
             Surface(
                 shape = MaterialTheme.shapes.medium,
                 shadowElevation = 1.dp,
-                color = surfaceColor,  // Color changes on click
+                color = surfaceColor,  // Changes based on isDarkMode state
                 modifier = Modifier.animateContentSize().padding(1.dp)
             ) {
                 Text(
                     text = msg.body,
                     modifier = Modifier.padding(all = 4.dp),
-                    maxLines = if (isExpanded) Int.MAX_VALUE else 1,  // Text visibility changes on click
-                    style = MaterialTheme.typography.bodyMedium  // Second text style
+                    maxLines = if (isExpanded) Int.MAX_VALUE else 1,  // Expand/collapse text
+                    style = MaterialTheme.typography.bodyMedium
                 )
             }
         }
