@@ -63,5 +63,6 @@ dependencies {
     implementation("androidx.compose.animation:animation")
     implementation("androidx.compose.animation:animation:1.5.1")
     implementation("androidx.compose.animation:animation")
-    implementation("androidx.compose.material3:material3")
+    implementation ("androidx.compose.material3:material3:1.1.1")
+
 }

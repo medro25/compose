@@ -4,7 +4,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,8 +23,8 @@ import androidx.navigation.compose.rememberNavController
 import com.example.composetutorial.ui.theme.ComposeTutorialTheme
 import androidx.compose.foundation.border
 import androidx.compose.animation.animateColorAsState
-
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.clickable
 
 data class Message(val author: String, val body: String)
 
@@ -40,31 +39,49 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainApp() {
     val navController = rememberNavController()
+    NavHost(
+        navController = navController,
+        startDestination = "main_view"
+    ) {
+        // Main View with the top bar
+        composable("main_view") {
+            Scaffold(
+                topBar = {
+                    SmallTopAppBar(
+                        title = { Text("Compose Tutorial") },
+                        actions = {
+                            IconButton(onClick = { navController.navigate("second_view") }) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_button_icon), // Replace with your icon resource
+                                    contentDescription = "Top Right Button"
+                                )
+                            }
+                        }
+                    )
+                }
+            ) { innerPadding ->
+                MainView(navController = navController, modifier = Modifier.padding(innerPadding))
+            }
+        }
 
-    NavHost(navController = navController, startDestination = "main_view") {
-        composable("main_view") { MainView(navController) }
-        composable("second_view") { SecondView(navController) }
+        // Second View with the top bar
+        composable("second_view") {
+            SecondView(navController = navController)
+        }
     }
 }
 
 @Composable
-fun MainView(navController: NavHostController) {
+fun MainView(navController: NavHostController, modifier: Modifier = Modifier) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.Center
+            .padding(16.dp)
     ) {
-        Button(
-            onClick = { navController.navigate("second_view") },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(text = "Go to Second View")
-        }
-        Spacer(modifier = Modifier.height(16.dp))
         LazyColumn {
             items(SampleData.conversationSample) { message ->
                 MessageCard(message)
@@ -73,28 +90,81 @@ fun MainView(navController: NavHostController) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SecondView(navController: NavController) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = "This is the Second View",
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-        Button(
-            onClick = {
-                navController.navigate("main_view") {
-                    popUpTo("main_view") { inclusive = true }
+    var userInput by remember { mutableStateOf("") } // State for text input
+
+    Scaffold(
+        topBar = {
+            SmallTopAppBar(
+                title = {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(end = 16.dp),
+                        horizontalArrangement = Arrangement.End // Align to the end
+                    ) {
+                        Text(
+                            text = "Second View",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = {
+                        navController.navigate("main_view") {
+                            popUpTo("main_view") { inclusive = true }
+                        }
+                    }) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_arrow_back), // Replace with your back icon resource
+                            contentDescription = "Back to Main Screen"
+                        )
+                    }
                 }
-            },
-            modifier = Modifier.fillMaxWidth()
+            )
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.Top
         ) {
-            Text(text = "Go Back to Main View")
+            // User text at the top
+            Text(
+                text = "The user", // Replace with the desired text
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            // Amine image below the user text
+            Row(modifier = Modifier.padding(all = 8.dp)) {
+                Image(
+                    painter = painterResource(R.drawable.amine), // Ensure this drawable exists
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .border(1.5.dp, MaterialTheme.colorScheme.secondary, CircleShape)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp)) // Add space below the image
+
+            // TextField for user input
+            OutlinedTextField(
+                value = userInput,
+                onValueChange = { userInput = it },
+                label = { Text("Enter your text") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+            )
         }
     }
 }
