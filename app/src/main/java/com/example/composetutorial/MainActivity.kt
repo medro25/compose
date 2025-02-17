@@ -1,8 +1,14 @@
 package com.example.composetutorial
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.net.Uri
 import android.os.Bundle
 import android.content.Context
+import android.content.Intent
+import android.os.Build
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -35,7 +41,15 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clip
+import androidx.core.app.NotificationCompat
 import com.example.composetutorial.ui.theme.ComposeTutorialTheme
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+
+
+
 
 
 data class Message(val author: String, val body: String)
@@ -75,16 +89,48 @@ fun saveImageToInternalStorage(context: Context, uri: Uri): Uri {
 }
 @OptIn(ExperimentalMaterial3Api::class)
 
-class MainActivity : ComponentActivity() {
+class MainActivity : ComponentActivity(), SensorEventListener {
+    private lateinit var sensorManager: SensorManager
+    private var lightSensor: Sensor? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Initialize the sensor manager
+        sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        lightSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LIGHT)
+
+        // Register the sensor listener
+        lightSensor?.let {
+            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
+        }
+
         setContent {
             ComposeTutorialTheme {
                 MainApp()
             }
         }
     }
+
+    // Correctly placed SensorEventListener methods
+    override fun onSensorChanged(event: SensorEvent?) {
+        event?.let {
+            val brightness = it.values[0] // Get brightness level in lux
+            showNotification(this, "Light Sensor", "Brightness: $brightness lux")
+
+        }
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+        // Not needed for this implementation
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        sensorManager.unregisterListener(this)
+    }
 }
+
 
 @Composable
 fun MainApp() {
@@ -225,34 +271,28 @@ fun MessageCard(msg: Message, imageUri: Uri?) {
 @Composable
 fun SecondView(navController: NavController) {
     val context = LocalContext.current
-    val userPreferences = remember { UserPreferences(context) }
     val coroutineScope = rememberCoroutineScope()
+    val userPreferences = remember { UserPreferences(context) }
 
     var userInput by remember { mutableStateOf("") }
-    var imageUri by remember { mutableStateOf<Uri?>(null) }
 
+    // Load stored username
     LaunchedEffect(Unit) {
         userPreferences.username.collect { storedUsername ->
             storedUsername?.let { userInput = it }
         }
     }
 
-    LaunchedEffect(Unit) {
-        userPreferences.imageUri.collect { storedImageUri ->
-            storedImageUri?.let { imageUri = Uri.parse(it) }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            showNotification(context, "Compose Tutorial", "Notification Enabled")
         }
     }
 
-    val pickImageLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let {
-            val savedUri = saveImageToInternalStorage(context, it)
-            imageUri = savedUri
-        }
-    }
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Edit Profile") }) }
+        topBar = { TopAppBar(title = { Text("Enable Notifications") }) }
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -267,19 +307,61 @@ fun SecondView(navController: NavController) {
                 label = { Text("Enter your name") },
                 modifier = Modifier.fillMaxWidth()
             )
+
             Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = { pickImageLauncher.launch("image/*") }) {
-                Text("Pick Image")
-            }
-            Spacer(modifier = Modifier.height(16.dp))
+
             Button(onClick = {
                 coroutineScope.launch {
-                    userPreferences.saveUserData(userInput.trim(), imageUri?.toString())
+                    userPreferences.saveUserData(userInput.trim(), null)
                 }
                 navController.navigate("main_view")
             }) {
                 Text("Save and Go Back")
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(onClick = {
+                notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            }) {
+                Text("Enable Notification")
+            }
         }
     }
+}
+
+// Function to Show Notification
+fun showNotification(context: Context, title: String, message: String) {
+    val channelId = "compose_tutorial_channel"
+    val notificationManager =
+        context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        val channel = NotificationChannel(
+            channelId,
+            "Compose Tutorial Notifications",
+            NotificationManager.IMPORTANCE_HIGH
+        )
+        notificationManager.createNotificationChannel(channel)
+    }
+
+    // Intent to open the app when notification is clicked
+    val intent = Intent(context, MainActivity::class.java).apply {
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+    }
+    val pendingIntent = PendingIntent.getActivity(
+        context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+    val notification = NotificationCompat.Builder(context, channelId)
+        .setSmallIcon(android.R.drawable.ic_dialog_info)
+        .setContentTitle(title)
+        .setContentText(message)
+        .setPriority(NotificationCompat.PRIORITY_HIGH)
+        .setDefaults(NotificationCompat.DEFAULT_ALL)
+        .setAutoCancel(true)
+        .setContentIntent(pendingIntent)  // <-- Clickable action added here
+        .build()
+
+    notificationManager.notify(1, notification)
 }
